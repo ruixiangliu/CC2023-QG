@@ -1,0 +1,93 @@
+---
+title: 'Practical: Evolutionary Quantitative Genetics'
+author: "Raphaël Scherrer [@EvoBioCC](https://twitter.com/EvoBioCC)"
+output:
+  html_document:
+    df_print: paged
+---
+
+Welcome to this practical on evolutionary quantitative genetics!
+
+# Exercise 1
+
+In population genetics we often focus of the genotype frequencies of a single locus that produces discrete, easily identifiable phenotypes. Bust most phenotypes are continuous and do not easily fall into discrete bins. Does that mean we cannot use principles from population genetics to study them? Let us look at an example.
+
+The code below generates a random population by assembling alleles together into genotypes at one locus, let's say, with alleles *a* and *A*, and shows the distribution of the phenotype in that population. You can choose the number of individuals to simulate and the frequency of allele *A* in the population. (In this simulation we assume that each allele *A* increases the phenotype of its bearer by 0.1, and that *aa* individuals have phenotype zero).
+
+## Question 1
+
+Run the following chunk of code. How many different phenotypes segregate in that population where the phenotype is encoded by a single locus?
+
+```{r, fig.show = "hide", warning = FALSE, message = FALSE}
+# Load useful packages
+library(tidyverse)
+theme_set(theme_classic())
+
+# Load useful function
+source("functions/sim_pop.R")
+
+set.seed(42) # for reproducible results
+
+# Simulate population
+sim_pop(nind = 1000, allfreq = 0.5)
+```
+
+It is possible to increase the number of loci that code for the phenotype, like this:
+
+```{r, fig.show = "hide"}
+sim_pop(nind = 1000, allfreq = 0.5, nloci = 2)
+```
+
+Here, it is assumed that every locus has two alleles (e.g. *a* and *A*, *b* and *B*, *c* and *C*, etc., where each upper case allele has the same effect of +0.1 on the phenotype) and that the allele frequencies are the same for all loci (i.e. `allfreq` is the frequency of *A* but also of *B*, *C*, etc.).
+
+## Question 2
+
+Play around with this code and try different numbers of loci. Does the distribution of phenotypes look discrete? What do you conclude about the ability of discrete units of inheritance (genetic loci) to generate continuous variation in traits?
+
+## Question 3 (bonus)
+
+Why do you think there are so few individuals with extreme phenotypes?
+
+# Exercise 2
+
+Consider two populations of the same species that have completely become fixed for different values of a given phenotype. In nature, that may happen if two populations adapt to different environments while remaining isolated from each other for a long time, but it is also readily achieved in the lab by rearing different lines (e.g. of *Drosophila*) in isolation. The distributions of phenotypes could look like this:
+
+```{r, echo = FALSE, fig.width = 4, fig.height = 2, fig.align = "center"}
+tibble(
+  z1 = rep(0, 100),
+  z2 = rep(20, 100)
+) %>%
+  pivot_longer(z1:z2) %>%
+  mutate(name = fct_recode(name, "Pop. 1" = "z1", "Pop. 2" = "z2")) %>%
+  ggplot(aes(x = value, fill = name)) +
+  geom_histogram(bins = 50) +
+  xlab("Phenotype") +
+  ylab("Count") +
+  labs(fill = NULL)
+```
+From those distributions the phenotype looks very discrete, almost like it could be encoded by a single locus with two alleles, say *a* and *A*, with allele *a* having fixed in population 1 (which would then be composed of only *aa* genotypes) and allele *A* having fixed in population 2 (then composed of only *AA* genotypes). But is that really the case? 
+
+Let us perform a digital experiment, where we cross those two populations. The following chunk of code does just that, and shows the distribution of phenotype in the resulting F1 population (i.e. of "hybrid" offspring, where `noff` is the number of offspring to generate).
+
+```{r, warning = FALSE, fig.show = "hide"}
+source("functions/cross_pops.R")
+cross_pops(noff = 100) + xlim(c(8, 12))
+```
+
+## Question 1
+
+What do you see when you run it? Does the distribution of the phenotype in F1 hybrids look anything different from what you would expect if the phenotype was encoded by a single (diploid) locus with two alleles?
+
+Now, let us continue this experiment by crossing F1 hybrids among themselves. That will form what we call the F2 generation. To do that, we use the same code as above, but now we specify the number of generations to run the experiment for (`ngens = 2` for F2).
+
+```{r, fig.show = "hide"}
+cross_pops(noff = 100, ngens = 2)
+```
+
+## Question 2
+
+What does the distribution of phenotypes in the F2 generation look like? Is that consistent with the phenotype being encoded by only one locus? Is it consistent with the phenotype being encoded by many loci? And if so, then why did the distribution of phenotypes in F1 look the way it did?
+
+## Question 3 (bonus)
+
+What do you think will happen to the distribution of phenotypes if we continue crossing those individuals among themselves (i.e. produce the F3, F4, ... F100 generations)? You can check your intuition by running the function `cross_pops()` with different numbers of generations. Does the distribution seem to change a lot? Why do you think that is?

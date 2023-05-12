@@ -1,0 +1,163 @@
+---
+title: 'Practical: Evolutionary Quantitative Genetics (answers)'
+author: "Raphaël Scherrer [@EvoBioCC](https://twitter.com/EvoBioCC)"
+output:
+  html_document:
+    df_print: paged
+---
+
+Welcome to this practical on evolutionary quantitative genetics!
+
+# Exercise 1
+
+In population genetics we often focus of the genotype frequencies of a single locus that produces discrete, easily identifiable phenotypes. Bust most phenotypes are continuous and do not easily fall into discrete bins. Does that mean we cannot use principles from population genetics to study them? Let us look at an example.
+
+The code below generates a random population by assembling alleles together into genotypes at one locus, let's say, with alleles *a* and *A*, and shows the distribution of the phenotype in that population. You can choose the number of individuals to simulate and the frequency of allele *A* in the population. (In this simulation we assume that each allele *A* increases the phenotype of its bearer by 0.1, and that *aa* individuals have phenotype zero).
+
+## Question 1
+
+Run the following chunks of code. How many different phenotypes segregate in that population where the phenotype is encoded by a single locus?
+
+```{r, fig.width = 3, fig.height = 2, fig.align = "center", warning = FALSE, message = FALSE}
+# Load useful package
+library(tidyverse)
+theme_set(theme_classic())
+
+# Load useful function
+source("functions/sim_pop.R")
+
+set.seed(42) # for reproducible results
+
+# Simulate population
+sim_pop(nind = 1000, allfreq = 0.5)
+```
+
+[**Answer**: We see three different phenotypes in this well-mixed population, and those correspond to the three possible (diploid) genotypes *aa*, *Aa* and *AA*. Pretty much what we would expect from population genetics theory! ]{style="color: green;"}
+
+It is possible to increase the number of loci that code for the phenotype, like this:
+
+```{r, fig.width = 3, fig.height = 2, fig.align = "center"}
+sim_pop(nind = 1000, allfreq = 0.5, nloci = 2)
+```
+
+Here, it is assumed that every locus has two alleles (e.g. *a* and *A*, *b* and *B*, *c* and *C*, etc., where each upper case allele has the same effect of +0.1 on the phenotype) and that the allele frequencies are the same for all loci (i.e. `allfreq` is the frequency of *A* but also of *B*, *C*, etc.). 
+
+## Question 2
+
+Play around with this code and try different numbers of loci. Does the distribution of phenotypes look discrete? What do you conclude about the ability of discrete units of inheritance (genetic loci) to generate continuous variation in traits?
+
+[**Answer**: Below we plot the distributions of phenotypes in a well-mixed population when the phenotype is encoded by 1, 2, 10 or 100 loci. ]{style="color: green;"}
+
+```{r, echo = FALSE, fig.width = 4, fig.height = 3, fig.align = "center"}
+
+# For multiple numbers of loci...
+map_dfr(c(1, 2, 10, 100), function(nloci) {
+
+  # Simulate and collect the data from the plots
+  sim_pop(nind = 1000, allfreq = 0.5, nloci = nloci)$data %>%
+    mutate(nloci = nloci)
+
+}) %>%
+  mutate(
+    
+    # Facet labels
+    nloci_lab = paste(nloci, "loci"),
+    nloci_lab = factor(nloci_lab, levels = paste(sort(unique(.$nloci)), "loci")),
+    nloci_lab = fct_recode(nloci_lab, "1 locus" = "1 loci")
+    
+  ) %>%
+  
+  # And plot
+  ggplot(aes(x = z, y = after_stat(density))) +
+  geom_histogram(bins = 50) +
+  xlab("Phenotype") +
+  ylab("Count") +
+  geom_density() +
+  facet_wrap(. ~ nloci_lab, scales = "free")
+
+```
+
+[We see that as the number of loci increases, the distribution looks more and more continuous. Actually, it is still discrete, but there are so many possible combinations of alleles (from *aabbccdd...* to *AABBCCDD...*) that the gaps between the discrete values are very, very small. That is good news for population genetics, because it means that quantitative, continuous traits can be accounted for by discrete genes and discrete alleles, provided that there are many. Of course one would need a different toolkit from that used when studying single loci, but it means that at least the principles of population genetics may be extended to account for continuously evolving traits. This is what quantitative genetics is. ]{style="color: green;"}
+
+## Question 3 (bonus)
+
+Why do you think there are so few individuals with extreme phenotypes?
+
+[**Answer**: With loci there are many, many combinations of alleles that are possible. With just 5 loci, there are $3^5 = 243$ possible diploid genotypes, and with 10 loci that number shoots up to $59049$. Of all those genotypes, only a tiny portion codes for the phenotypic values at the ends of the distribution (the two most extremes being *aabbccddee...* and *AABBCCDDEE...*). Most combinations lie between those extremes, and many of those code for the same values of the phenotype (e.g. *AABBccDDee*, *aaBBCCddEE*, *AAbbccDDEE* all give the same phenotype). Basically, there are many more ways to produce intermediate phenotypes than extreme ones by randomly combining alleles together.\
+]{style="color: green;"}
+
+# Exercise 2
+
+Consider two populations of the same species that have completely become fixed for different values of a given phenotype. In nature, that may happen if two populations adapt to different environments while remaining isolated from each other for a long time, but it is also readily achieved in the lab by rearing different lines (e.g. of *Drosophila*) in isolation. The distributions of phenotypes could look like this:
+
+```{r, echo = FALSE, fig.width = 4, fig.height = 2, fig.align = "center"}
+tibble(
+  z1 = rep(0, 100),
+  z2 = rep(20, 100)
+) %>%
+  pivot_longer(z1:z2) %>%
+  mutate(name = fct_recode(name, "Pop. 1" = "z1", "Pop. 2" = "z2")) %>%
+  ggplot(aes(x = value, fill = name)) +
+  geom_histogram(bins = 50) +
+  xlab("Phenotype") +
+  ylab("Count") +
+  labs(fill = NULL)
+```
+
+From those distributions the phenotype looks very discrete, almost like it could be encoded by a single locus with two alleles, say *a* and *A*, with allele *a* having fixed in population 1 (which would then be composed of only *aa* genotypes) and allele *A* having fixed in population 2 (then composed of only *AA* genotypes). But is that really the case?
+
+Let us perform a digital experiment, where we cross those two populations. The following chunk of code does just that, and shows the distribution of phenotype in the resulting F1 population (i.e. of "hybrid" offspring, where `noff` is the number of offspring to generate).
+
+```{r, warning = FALSE, fig.width = 3, fig.height = 2, fig.align = "center"}
+source("functions/cross_pops.R")
+cross_pops(noff = 100) + xlim(c(8, 12))
+```
+
+## Question 1 
+
+What do you see when you run it? Does the distribution of the phenotype in F1 hybrids look anything different from what you would expect if the phenotype was encoded by a single (diploid) locus with two alleles?
+
+[**Answer**: All F1 hybrids are exactly halfway between the two parent populations in terms of phenotype. That is what we would expect if the phenotype was encoded by a single locus: the F1 would consist only of heterozygotes *Aa*. ]{style="color: green;"}
+
+Now, let us continue this experiment by crossing F1 hybrids among themselves. That will form what we call the F2 generation. To do that, we use the same code as above, but now we specify the number of generations to run the experiment for (`ngens = 2` for F2).
+
+```{r, fig.width  = 3, fig.height = 2, fig.align = "center"}
+cross_pops(noff = 100, ngens = 2)
+```
+
+## Question 2
+
+What does the distribution of phenotypes in the F2 generation look like? Is that consistent with the phenotype being encoded by only one locus? Is it consistent with the phenotype being encoded by many loci? And if so, then why did the distribution of phenotypes in F1 look the way it did?
+
+[**Answer**: The distribution of phenotypes in the F2 generation is now incompatible with the phenotype being encoded by one locus. If that were the case, the F2 would only consist of three "bins": genotypes *aa*, *Aa* and *AA*. Instead, we have a nearly continuous distribution of phenotype values, suggesting that the trait is actually encoded by many loci with small effects. The reason why the distribution of F1 phenotypes was not continuous, and instead all concentrated in one bin, is that the F1 consisted only of heterozygotes at all the loci involved. That is, by crossing a population *aabbccddee...* with a population *AABBCCDDEE...*, we formed a F1 generation made of only *AaBbCcDdEd...*, which will fall exactly halfway in between the two parental phenotypes. It is only when those heterozygotes mate with each other that many combinations can be formed (following the basic rules of Mendelian genetics), e.g. *aaBbCCDdee...*, *AaBbccddeE...*, etc.\
+]{style="color: green;"}
+
+## Question 3 (bonus)
+
+What do you think will happen to the distribution of phenotypes if we continue crossing those individuals among themselves (i.e. produce the F3, F4, ... F100 or even F500 generations)? You can check your intuition by running the function `cross_pops()` with different numbers of generations. Does the distribution seem to change a lot? Why do you think that is?
+
+```{r, echo = FALSE}
+data <- map_dfr(c(1, 2, 3, 5, 100, 500), function(ngens) {
+
+  cross_pops(noff = 100, ngens = ngens)$data %>%
+    mutate(ngens = ngens)
+
+})
+```
+
+```{r, echo = FALSE, fig.width = 4, fig.height = 3, warning = FALSE, fig.align = "center"}
+data %>%
+  mutate(
+    ngens_lab = paste0("F", ngens),
+    ngens_lab = factor(ngens_lab, levels = paste0("F", sort(unique(.$ngens))))
+  ) %>%
+  ggplot(aes(x = z, y = after_stat(density))) +
+  geom_histogram(bins = 50) +
+  xlab("Phenotype") +
+  ylab("Count") +
+  geom_density() +
+  facet_wrap(. ~ ngens_lab, scales = "free") +
+  xlim(c(7, 13))
+```
+[**Answer**: We see that the distribution of phenotypes slowly becomes narrower from one generation to the next. This is because of a statistical phenomenon called **regression to the mean**: just by chance, when the extremes of a distribution are re-sampled, they will show values that are closer to the mean of the population. For example, if students answer a test completely randomly, then by chance the worst-performing students will do better the next time, on average, and the best-performing students will do worse. Here, every generation we basically re-sample new combinations of alleles from the previous generation, and so, through the same phenomenon, we make the number of extreme genotypes (those on the edges of the distribution) less and less common. Check out this [video](https://www.youtube.com/watch?time_continue=417&v=1tSqSMOyNFE&embeds_referring_euri=https%3A%2F%2Fbuiltin.com%2F&source_ve_path=MzY4NDIsMjg2NjY&feature=emb_logo) for a primer on regression to the mean.\
+]{style="color: green;"}
